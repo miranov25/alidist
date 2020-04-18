@@ -12,11 +12,18 @@ requires:
 #!/bin/bash -e
 
 # env PYTHONUSERBASE="$INSTALLROOT" pip3 install --user -r alibuild_requirements.txt
-env PYTHONUSERBASE="$INSTALLROOT" ALIBUILD=1 pip3 install --user file://${SOURCEDIR}
+PIPOPTION="--user"
+if [ ! "X$VIRTUAL_ENV" = X ]; then
+  PIPOPTION=""
+fi
+
+env PYTHONUSERBASE="$INSTALLROOT" ALIBUILD=1 pip3 install $PIPOPTION file://${SOURCEDIR}
 XJALIENFS_SITEPACKAGES=$(find ${INSTALLROOT} -name site-packages)
 
-sed -i".bak" 's/#!.*python.*/#!\/usr\/bin\/env python3/' ${INSTALLROOT}/bin/*
-rm -v ${INSTALLROOT}/bin/*.bak
+if [  "X$VIRTUAL_ENV" = X ]; then
+  sed -i".bak" 's/#!.*python.*/#!\/usr\/bin\/env python3/' ${INSTALLROOT}/bin/*
+  rm -v ${INSTALLROOT}/bin/*.bak
+fi
 
 # Modulefile
 MODULEDIR="$INSTALLROOT/etc/modulefiles"

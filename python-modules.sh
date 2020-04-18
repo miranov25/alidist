@@ -25,6 +25,36 @@ if python3 -c 'import sys; exit(0 if 1000*sys.version_info.major + sys.version_i
   echo $PIP36_REQUIREMENTS | tr \  \\n >> requirements.txt
 fi
 
+MATPLOTLIB_TAG="3.0.3"
+
+if [ ! "X$VIRTUAL_ENV" = X ]; then
+  echo "matplotlib==$MATPLOTLIB_TAG" >> requirements.txt
+  pip install -r requirements.txt
+  # Modulefile
+  MODULEDIR="$INSTALLROOT/etc/modulefiles"
+  MODULEFILE="$MODULEDIR/$PKGNAME"
+  mkdir -p "$MODULEDIR"
+  cat > "$MODULEFILE" <<EoF
+#%Module1.0
+proc ModulesHelp { } {
+  global version
+  puts stderr "ALICE Modulefile for $PKGNAME $PKGVERSION-@@PKGREVISION@$PKGHASH@@"
+}
+set version $PKGVERSION-@@PKGREVISION@$PKGHASH@@
+module-whatis "ALICE Modulefile for $PKGNAME $PKGVERSION-@@PKGREVISION@$PKGHASH@@ - modules from already defined virtual env $VIRTUAL_ENV"
+# Dependencies
+module load BASE/1.0 ${PYTHON_REVISION:+Python/$PYTHON_VERSION-$PYTHON_REVISION} ${ALIEN_RUNTIME_REVISION:+AliEn-Runtime/$ALIEN_RUNTIME_VERSION-$ALIEN_RUNTIME_REVISION}
+# Our environment
+set PYTHON_MODULES_ROOT \$::env(BASEDIR)/$PKGNAME/\$version
+# prepend-path PATH \$PYTHON_MODULES_ROOT/share/python-modules/bin
+# prepend-path LD_LIBRARY_PATH \$PYTHON_MODULES_ROOT/share/python-modules/lib
+# prepend-path PYTHONPATH \$PYTHON_MODULES_ROOT/share/python-modules/lib/python/site-packages
+EoF
+
+fi
+
+exit
+
 # We use a different INSTALLROOT, so that we can build updatable RPMS which
 # do not conflict with the underlying Python installation.
 PYTHON_MODULES_INSTALLROOT=$INSTALLROOT/share/python-modules
@@ -38,25 +68,24 @@ grep RootInteractive requirements.txt && env PYTHONUSERBASE="$PYTHON_MODULES_INS
 grep RootInteractive requirements.txt && env PYTHONUSERBASE="$PYTHON_MODULES_INSTALLROOT" pip3 install --user -IU cython==0.29.16
 env PYTHONUSERBASE="$PYTHON_MODULES_INSTALLROOT" pip3 install --user -IU -r requirements.txt
 
-# Find the proper Python lib library and export it
-pushd "$PYTHON_MODULES_INSTALLROOT"
-  if [[ -d lib64 ]]; then
-    ln -nfs lib64 lib  # creates lib pointing to lib64
-  elif [[ -d lib ]]; then
-       ln -nfs lib lib64 # creates lib64 pointing to lib
-  fi
-  pushd lib
-    ln -nfs python$PYVER python
+  # Find the proper Python lib library and export it
+  pushd "$PYTHON_MODULES_INSTALLROOT"
+    if [[ -d lib64 ]]; then
+      ln -nfs lib64 lib  # creates lib pointing to lib64
+    elif [[ -d lib ]]; then
+         ln -nfs lib lib64 # creates lib64 pointing to lib
+    fi
+    pushd lib
+      ln -nfs python$PYVER python
+    popd
+    pushd bin
+      # Fix shebangs: remove hardcoded Python path
+      sed -i.deleteme -e "1 s|^#!${PYTHON_MODULES_INSTALLROOT}/bin/\(.*\)$|#!/usr/bin/env \1|" * || true
+      rm -f *.deleteme || true
+    popd
   popd
-  pushd bin
-    # Fix shebangs: remove hardcoded Python path
-    sed -i.deleteme -e "1 s|^#!${PYTHON_MODULES_INSTALLROOT}/bin/\(.*\)$|#!/usr/bin/env \1|" * || true
-    rm -f *.deleteme || true
-  popd
-popd
 
 # Install matplotlib (quite tricky)
-MATPLOTLIB_TAG="3.0.3"
 if [[ $ARCHITECTURE != slc* ]]; then
   # Simply get it via pip in most cases
   env PYTHONUSERBASE=$PYTHON_MODULES_INSTALLROOT pip3 install --user "matplotlib==$MATPLOTLIB_TAG"
@@ -79,7 +108,7 @@ tkagg = $MATPLOTLIB_TKAGG
 wxagg = False
 macosx = False
 EOF
-
+  
   # matplotlib wants include files in <PackageRoot>/include, but this is not the case for FreeType
   if [[ $FREETYPE_ROOT ]]; then
     mkdir fake_freetype_root
