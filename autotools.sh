@@ -1,6 +1,6 @@
 package: autotools
 version: "%(tag_basename)s"
-tag: v1.6.3
+tag: v1.5.0
 source: https://github.com/alisw/autotools
 prefer_system: "(?!slc5|slc6)"
 prefer_system_check: |
@@ -28,33 +28,30 @@ popd
 
 rsync -a --delete --exclude '**/.git' $SOURCEDIR/ .
 
-# Use our auto* tools as we build them
+# Use our auto* tools while we build them
 export PATH=$INSTALLROOT/bin:$PATH
 export LD_LIBRARY_PATH=$INSTALLROOT/lib:$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=$INSTALLROOT/lib:$DYLD_LIBRARY_PATH
 
-# help2man
-pushd help2man*
+# m4 -- requires: nothing special
+pushd m4*
   ./configure --disable-dependency-tracking --prefix $INSTALLROOT
   make ${JOBS+-j $JOBS}
   make install
   hash -r
 popd
 
-# autoconf -- requires: m4
-# FIXME: is that really true? on slc7 it fails if I do it the other way around
-# with the latest version of autoconf / m4
-pushd autoconf*
-  autoreconf -ivf
-  ./configure --prefix $INSTALLROOT
-  make MAKEINFO=true ${JOBS+-j $JOBS}
-  make MAKEINFO=true install
+# libtool -- requires: m4
+pushd libtool*
+  ./configure --disable-dependency-tracking --prefix $INSTALLROOT --enable-ltdl-install
+  make ${JOBS+-j $JOBS}
+  make install
   hash -r
 popd
 
-# m4 -- requires: nothing special
-pushd m4*
-  autoreconf -ivf
-  ./configure --disable-dependency-tracking --prefix $INSTALLROOT
+# autoconf -- requires: m4
+pushd autoconf*
+  ./configure --prefix $INSTALLROOT
   make ${JOBS+-j $JOBS}
   make install
   hash -r
@@ -62,7 +59,6 @@ popd
 
 # gettext -- requires: nothing special
 pushd gettext*
-  autoreconf -ivf
   ./configure --prefix $INSTALLROOT \
               --without-xz \
               --without-bzip2 \
@@ -83,16 +79,7 @@ popd
 
 # automake -- requires: m4, autoconf, gettext
 pushd automake*
-  sh ./bootstrap
-  ./configure --prefix $INSTALLROOT
-  make MAKEINFO=true ${JOBS+-j $JOBS}
-  make MAKEINFO=true install
-  hash -r
-popd
-
-# libtool -- requires: m4
-pushd libtool*
-  ./configure --disable-dependency-tracking --prefix $INSTALLROOT --enable-ltdl-install
+  ./configure --disable-dependency-tracking --prefix $INSTALLROOT
   make ${JOBS+-j $JOBS}
   make install
   hash -r

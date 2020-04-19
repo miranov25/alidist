@@ -1,7 +1,7 @@
 package: libpng
 version: v1.6.34
 requires:
- - zlib
+ - AliEn-Runtime:(?!.*ppc64)
 build_requires:
  - CMake
 source: https://github.com/alisw/libpng
